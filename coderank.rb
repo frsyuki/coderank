@@ -109,6 +109,7 @@ if $0 == __FILE__
     :git => 'git',
     :cache_dir =>'/tmp/coderank',
     :since => '1970-01-01',
+    :parallel => 3,
     :list_repo => nil,
     :list_file => 'list.md',
     :list_branch => 'master',
@@ -129,6 +130,9 @@ if $0 == __FILE__
   }
   op.on('-s', '--since DATE', 'since') {|s|
     opts[:since] = s
+  }
+  op.on('-P', '--parallel N', 'parallel', Integer) {|i|
+    opts[:parallel] = i
   }
 
   op.on('-u', '--gh-user USER', 'github user') {|s|
