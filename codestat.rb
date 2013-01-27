@@ -39,10 +39,21 @@ class Repo
     end
   end
 
+  require 'time'
+
   def aggregate!(since, aggr)
     update!
     grepo = Grit::Repo.new(@cache_path)
-    grepo.commits_since(@branch, since).each(&aggr.method(:add))
+
+    # commits_since doesn't work as I expected...
+    #grepo.commits_since(@branch, since).each(&aggr.method(:add))
+    since_time = Time.parse(since)
+    Grit::Commit.find_all(grepo, 'master', {}).each {|c|
+      if c.committed_date >= since_time
+        aggr.add(c)
+      end
+    }
+
     self
   end
 
@@ -56,17 +67,21 @@ class Aggregator
   def initialize
     @plus_hash = Hash.new(0)
     @minus_hash = Hash.new(0)
+    @name_hash = Hash.new('')
   end
 
   attr_reader :plus_hash
   attr_reader :minus_hash
+  attr_reader :name_hash
 
   def authors
     @plus_hash.keys
   end
 
   def add(gcommit)
-    author = gcommit.author.to_s
+    author = gcommit.author.email.to_s
+    name = gcommit.author.to_s
+
     plus = 0
     minus = 0
     gcommit.show.each {|g|
@@ -78,15 +93,25 @@ class Aggregator
     }
     @plus_hash[author] += plus
     @minus_hash[author] += minus
+    last_name = @name_hash[author]
+    if last_name.length < name.length
+      @name_hash[author] = name
+    end
   end
 
   def merge!(other)
     other_plus_hash = other.plus_hash
     other_minus_hash = other.minus_hash
+    other_name_hash = other.name_hash
 
     other.authors.each {|a|
       @plus_hash[a] += other_plus_hash[a]
       @minus_hash[a] += other_minus_hash[a]
+      last_name = @name_hash[a]
+      next_name = other_name_hash[a]
+      if last_name.length < next_name.length
+        @name_hash[a] = next_name
+      end
     }
 
     self
@@ -168,7 +193,7 @@ if $0 == __FILE__
   aggr = CodeStat.run!(url_branches, opts)
 
   aggr.authors.each {|a|
-    STDERR.puts "#{a},#{aggr.plus_hash[a]},#{aggr.minus_hash[a]}"
+    STDERR.puts "#{a},#{aggr.name_hash[a]},#{aggr.plus_hash[a]},#{aggr.minus_hash[a]}"
   }
 end
 

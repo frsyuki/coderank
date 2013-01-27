@@ -59,7 +59,7 @@ EOF
 
     def format(aggr)
       authors = aggr.authors.map {|a|
-        Author.new(a, aggr.plus_hash[a], aggr.minus_hash[a])
+        Author.new(aggr.name_hash[a], aggr.plus_hash[a], aggr.minus_hash[a])
       }
       authors = authors.sort_by {|a| -a.plus }
       @erb.result(binding)
