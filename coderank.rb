@@ -131,6 +131,12 @@ if $0 == __FILE__
   op.on('-s', '--since DATE', 'since') {|s|
     opts[:since] = s
   }
+  op.on('-U', '--unique', 'unique commit ids') {
+    opts[:unique] = true
+  }
+  op.on('-l', '--limit LIMIT', 'commit limit', Integer) {|i|
+    opts[:commit_limit] = i
+  }
   op.on('-P', '--parallel N', 'parallel', Integer) {|i|
     opts[:parallel] = i
   }

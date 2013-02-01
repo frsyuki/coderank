@@ -48,7 +48,7 @@ class Repo
     # commits_since doesn't work as I expected...
     #grepo.commits_since(@branch, since).each(&aggr.method(:add))
     since_time = Time.parse(since)
-    Grit::Commit.find_all(grepo, 'master', {}).each {|c|
+    Grit::Commit.find_all(grepo, @branch, {}).each {|c|
       if c.committed_date >= since_time
         aggr.add(c)
       end
@@ -64,7 +64,9 @@ class Repo
 end
 
 class Aggregator
-  def initialize
+  def initialize(commit_limit=nil, uniq_db=nil)
+    @commit_limit = commit_limit || 0x7fffffff
+    @uniq_db = uniq_db
     @plus_hash = Hash.new(0)
     @minus_hash = Hash.new(0)
     @name_hash = Hash.new('')
@@ -79,6 +81,12 @@ class Aggregator
   end
 
   def add(gcommit)
+    if @uniq_db
+      id = gcommit.id
+      return if @uniq_db[id]
+      @uniq_db[id] = ''
+    end
+
     author = gcommit.author.email.to_s
     name = gcommit.author.to_s
 
@@ -91,8 +99,12 @@ class Aggregator
         minus += diff.scan(/^\-/).size
       end
     }
-    @plus_hash[author] += plus
-    @minus_hash[author] += minus
+
+    if plus < @commit_limit
+      @plus_hash[author] += plus
+      @minus_hash[author] += minus
+    end
+
     last_name = @name_hash[author]
     if last_name.length < name.length
       @name_hash[author] = name
@@ -125,9 +137,20 @@ class CodeStat
     }
 
     para = opts[:parallel] || 3
+    commit_limit = opts[:commit_limit] || 10000
 
-    aggrs = Parallel.map(repos, :in_processes=>para) {|repo|
-      aggr = Aggregator.new
+    unique = !!opts[:unique]
+    if unique
+      require 'tokyocabinet'
+      uniq_db = TokyoCabinet::ADB.new
+      uniq_db.open('*')
+      parallel_opts = {:in_threads => para}
+    else
+      parallel_opts = {:in_processes => para}
+    end
+
+    aggrs = Parallel.map(repos, parallel_opts) {|repo|
+      aggr = Aggregator.new(commit_limit, uniq_db)
       begin
         repo.aggregate!(opts[:since], aggr)
       rescue
@@ -164,6 +187,12 @@ if $0 == __FILE__
   }
   op.on('-s', '--since DATE', 'since') {|s|
     opts[:since] = s
+  }
+  op.on('-U', '--unique', 'unique commit ids') {
+    opts[:unique] = true
+  }
+  op.on('-l', '--limit LIMIT', 'commit limit', Integer) {|i|
+    opts[:commit_limit] = i
   }
 
   (class<<self;self;end).module_eval do
