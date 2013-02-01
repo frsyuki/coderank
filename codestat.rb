@@ -9,6 +9,19 @@ class ShellUtil
       raise "'#{cmd.first}' failed"
     end
   end
+
+  def self.sh_dir(dir, *cmd)
+    puts "#{cmd.join(' ')}"
+    pid = fork do
+      Dir.chdir dir
+      exec(*cmd)
+      exit! 127
+    end
+    pid, stat = Process.waitpid2(pid)
+    unless stat.success?
+      raise "'#{cmd.first}' failed"
+    end
+  end
 end
 
 class Repo
@@ -34,9 +47,7 @@ class Repo
   def update!
     clone_if_not_exists!
     puts "> pull #{@url} #{@branch} at #{@cache_path}"
-    Dir.chdir(@cache_path) do
-      ShellUtil.sh @git, 'pull'
-    end
+    ShellUtil.sh_dir @cache_path, @git, 'pull'
   end
 
   require 'time'
