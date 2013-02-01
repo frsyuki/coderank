@@ -122,6 +122,14 @@ class Aggregator
     end
   end
 
+  def data
+    aggr = Aggregator.new
+    aggr.plus_hash.merge!(@plus_hash)
+    aggr.minus_hash.merge!(@minus_hash)
+    aggr.name_hash.merge!(@name_hash)
+    aggr
+  end
+
   def merge!(other)
     other_plus_hash = other.plus_hash
     other_minus_hash = other.minus_hash
@@ -170,7 +178,7 @@ class CodeStat
           puts "      #{bt}"
         }
       end
-      aggr
+      aggr.data
     }
 
     aggrs.inject(Aggregator.new, &:merge!)
