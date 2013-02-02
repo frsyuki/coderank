@@ -1,6 +1,5 @@
 require 'grit'
 require 'fileutils'
-require 'parallel'
 
 class ShellUtil
   def self.sh(*cmd)
@@ -168,7 +167,7 @@ class CodeStat
       parallel_opts = {:in_processes => para}
     end
 
-    aggrs = Parallel.map(repos, parallel_opts) {|repo|
+    m = Proc.new do |repo|
       aggr = Aggregator.new(commit_limit, uniq_db)
       begin
         repo.aggregate!(opts[:since], aggr)
@@ -179,7 +178,14 @@ class CodeStat
         }
       end
       aggr.data
-    }
+    end
+
+    if para == 1
+      aggrs = repos.map(&m)
+    else
+      require 'parallel'
+      Parallel.map(repos, parallel_opts, &m)
+    end
 
     aggrs.inject(Aggregator.new, &:merge!)
   end
@@ -193,6 +199,7 @@ if $0 == __FILE__
     :git => 'git',
     :cache_dir =>'/tmp/codestat',
     :since => '1970-01-01',
+    :commit_limit => 10000,
   }
 
   op = OptionParser.new
